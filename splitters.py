@@ -26,8 +26,8 @@ class TimeCaseSplit:
         dates = pd.date_range(self.train_start, grouped.max(), freq=self.train_freq)
         for i in range(0, len(dates)):
             train_interval = pd.Interval(left=dates[0], 
-                                         right = dates[i] + self.train_size, 
-                                         closed='both')
+                                        right = dates[i] + self.train_size, 
+                                        closed='both')
             
             train_subset = max_by_id[(max_by_id>=train_interval.left) & (max_by_id<=train_interval.right)]
             train_subset, train_interval = strategy.filter(train_subset, train_interval)
@@ -55,6 +55,7 @@ def to_time_interval(interval, max_timestamp):
 
 class CummulativeStrategy:
     def filter(self, max_timestamp, interval):
+        # max_timestamp is actualy the train_subset and train_interval otherwise it does not work with how the filter method is used 
         return max_timestamp, interval
 
 class NonCummulativeStrategy:
@@ -66,8 +67,8 @@ class NonCummulativeStrategy:
         if isinstance(self.train_size, pd.DateOffset):
             left = max(interval.left, interval.right - self.train_size)
             train_interval = pd.Interval(left = left,
-                                         right = interval.right,
-                                         closed = 'both')
+                                        right = interval.right,
+                                        closed = 'both')
             result = max_timestamp[(max_timestamp >= train_interval.left) & (max_timestamp <= train_interval.right)]
         else: 
             right = len(max_timestamp) - 1

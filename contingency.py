@@ -30,7 +30,7 @@ def compute_all_chi2(X, splits, verbose=False):
         pvalues = []
         for c in X.columns:
             data = pd.concat([pd.DataFrame({'d': X[c][train_index], 'i': str(train_interval)}),
-                              pd.DataFrame({'d': X[c][test_index], 'i': str(test_interval)})], axis=0)
+                            pd.DataFrame({'d': X[c][test_index], 'i': str(test_interval)})], axis=0)
 
             contingency = pd.crosstab(data.i, data.d)    
             if contingency.size == 0:

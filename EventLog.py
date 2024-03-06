@@ -4,7 +4,7 @@ from time import time
 import sys
 from sklearn.base import TransformerMixin
 from sklearn.model_selection import GroupShuffleSplit
-from sklearn.utils import safe_indexing
+from sklearn.utils import _safe_indexing
 from sklearn.preprocessing import OneHotEncoder
 from itertools import chain
 from sklearn.ensemble import RandomForestRegressor
@@ -18,7 +18,7 @@ class EventLog:
         self.timestamp_column = timestamp_column
         self.df = df.sort_values([self.id_column, self.timestamp_column]).reset_index(drop=True)
         
-        if not pd.core.dtypes.common.is_datetime_or_timedelta_dtype(self.df[self.timestamp_column]):
+        if not pd.core.dtypes.common.is_datetime64_dtype(self.df[self.timestamp_column]):
             temp = pd.to_datetime(self.df[self.timestamp_column], infer_datetime_format=True,utc=True, errors='raise')
             print('Found ' + str(np.any(pd.isnull(temp))))
             self.df[self.timestamp_column] = temp
@@ -107,7 +107,7 @@ class WrapperEncoder:
         
     def transform(self, X):
         result = self.encoder.transform(X.drop(self.id_column, axis=1))
-        return pd.DataFrame(data=result, columns=self.encoder.get_feature_names())
+        return pd.DataFrame(data=result, columns=self.encoder.get_feature_names_out())
     
     def fit_transform(self, X, y=None):
         return self.fit(X, y).transform(X)
@@ -164,7 +164,7 @@ class FrequencyEncoder(OneHotEncoder):
     def __init__(self, id_column, handle_unknown='error'):
         self.handle_unknown = handle_unknown
         self.id_column = id_column
-        self._categories = 'auto'
+        self.categories = 'auto'
         
     def fit(self,X, y = None):
         self._fit(X.drop(self.id_column, axis=1), handle_unknown=self.handle_unknown)
@@ -213,65 +213,65 @@ def transform_timedeltas(X):
         return df_X
             
 
-class AggregateTransformer(TransformerMixin):
+# class AggregateTransformer(TransformerMixin):
     
-    def __init__(self, case_id_col, cat_cols, num_cols, boolean=False, fillna=True):
-        self.case_id_col = case_id_col
-        self.cat_cols = cat_cols
-        self.num_cols = num_cols
+#     def __init__(self, case_id_col, cat_cols, num_cols, boolean=False, fillna=True):
+#         self.case_id_col = case_id_col
+#         self.cat_cols = cat_cols
+#         self.num_cols = num_cols
         
-        self.boolean = boolean
-        self.fillna = fillna
+#         self.boolean = boolean
+#         self.fillna = fillna
         
-        self.columns = None
+#         self.columns = None
         
-        self.fit_time = 0
-        self.transform_time = 0
+#         self.fit_time = 0
+#         self.transform_time = 0
     
     
-    def fit(self, X, y=None):
-        return self
+#     def fit(self, X, y=None):
+#         return self
     
-    def transform(self, X, y=None):
-        start = time()
+#     def transform(self, X, y=None):
+#         start = time()
         
-        # transform numeric cols
-        if len(self.num_cols) > 0:
-            dt_numeric = X.groupby(self.case_id_col)[self.num_cols].agg({'mean':np.mean, 'max':np.max, 'min':np.min, 'sum':np.sum, 'std':np.std})
-            dt_numeric.columns = ['_'.join(col).strip() for col in dt_numeric.columns.values]
+#         # transform numeric cols
+#         if len(self.num_cols) > 0:
+#             dt_numeric = X.groupby(self.case_id_col)[self.num_cols].agg({'mean':np.mean, 'max':np.max, 'min':np.min, 'sum':np.sum, 'std':np.std})
+#             dt_numeric.columns = ['_'.join(col).strip() for col in dt_numeric.columns.values]
             
-        # transform cat cols
-        dt_transformed = pd.get_dummies(X[self.cat_cols])
-        dt_transformed[self.case_id_col] = X[self.case_id_col]
-        del X
-        if self.boolean:
-            dt_transformed = dt_transformed.groupby(self.case_id_col).max()
-        else:
-            dt_transformed = dt_transformed.groupby(self.case_id_col).sum()
+#         # transform cat cols
+#         dt_transformed = pd.get_dummies(X[self.cat_cols])
+#         dt_transformed[self.case_id_col] = X[self.case_id_col]
+#         del X
+#         if self.boolean:
+#             dt_transformed = dt_transformed.groupby(self.case_id_col).max()
+#         else:
+#             dt_transformed = dt_transformed.groupby(self.case_id_col).sum()
         
-        # concatenate
-        if len(self.num_cols) > 0:
-            dt_transformed = pd.concat([dt_transformed, dt_numeric], axis=1)
-            del dt_numeric
+#         # concatenate
+#         if len(self.num_cols) > 0:
+#             dt_transformed = pd.concat([dt_transformed, dt_numeric], axis=1)
+#             del dt_numeric
         
-        # fill missing values with 0-s
-        if self.fillna:
-            dt_transformed = dt_transformed.fillna(0)
+#         # fill missing values with 0-s
+#         if self.fillna:
+#             dt_transformed = dt_transformed.fillna(0)
             
-        # add missing columns if necessary
-        if self.columns is None:
-            self.columns = dt_transformed.columns
-        else:
-            missing_cols = [col for col in self.columns if col not in dt_transformed.columns]
-            for col in missing_cols:
-                dt_transformed[col] = 0
-            dt_transformed = dt_transformed[self.columns]
+#         # add missing columns if necessary
+#         if self.columns is None:
+#             self.columns = dt_transformed.columns
+#         else:
+#             missing_cols = [col for col in self.columns if col not in dt_transformed.columns]
+#             for col in missing_cols:
+#                 dt_transformed[col] = 0
+#             dt_transformed = dt_transformed[self.columns]
         
-        self.transform_time = time() - start
-        return dt_transformed
+#         self.transform_time = time() - start
+#         return dt_transformed
     
-    def get_feature_names(self):
-        return self.columns
+#     def get_feature_names(self):
+#         return self.columns
 
 
 class AggregateTransformer(TransformerMixin):
