@@ -155,9 +155,8 @@ class VotingPretrainedClassifier:
             report_reg = classification_report(Y_test, test_result, output_dict=True)
             last_test = report_reg[str(self.summary_class)]['f1-score']
 
-            if last_test < threshold:
+            if last_test < self.threshold:
                 self.clf_list.pop()
-        
         return
 
     def fit(self, X, y):
