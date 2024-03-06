@@ -26,7 +26,12 @@ def compute_y_chi2(y, splits, verbose=False):
 def compute_all_chi2(X, splits, verbose=False):
     summary = []
     detail = []
+    # iterate over each split 
+    counter = 1
     for train_index, test_index, train_interval, test_interval in splits:
+        print("Split no.: {} ".format(counter))
+        counter += 1 
+        
         pvalues = []
         for c in X.columns:
             data = pd.concat([pd.DataFrame({'d': X[c][train_index], 'i': str(train_interval)}),
