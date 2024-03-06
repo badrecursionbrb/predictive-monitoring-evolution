@@ -331,7 +331,7 @@ class AggregateTransformer(TransformerMixin):
         self.transform_time = time() - start
         return dt_transformed
     
-    def get_feature_names(self):
+    def get_feature_names_out(self):
         return self.columns            
 
 def run_experiment(X, y, splits):
