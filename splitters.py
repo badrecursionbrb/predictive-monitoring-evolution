@@ -15,15 +15,18 @@ class TimeCaseSplit:
         self.threshold = threshold
         
     def split(self, X, y, group, timestamp, strategy):
-        grpby = pd.concat([group, timestamp], keys=['group', 'timestamp'], axis=1).groupby('group')['timestamp']
-        max_by_id = grpby.max().sort_values()
-        grouped = grpby.transform('max')
+        # the strategy specifies how the train set is filtered 
+        # group is the case id column as a DataFrame
+        grpby = pd.concat([group, timestamp], keys=['group', 'timestamp'], axis=1).groupby('group')['timestamp'] # concat by group and timestamp and group by case (group)
+        max_by_id = grpby.max().sort_values() # get max of each group i.e. case and then sort by values (i.e. by end timestamp) 
+        grouped = grpby.transform('max') # assign the max value to each original value of each group 
 
         if self.train_start is None:
             self.train_start = grouped.min()
         max_timestamp = timestamp.max()
             
         dates = pd.date_range(self.train_start, grouped.max(), freq=self.train_freq)
+        print(dates)
         for i in range(0, len(dates)):
             train_interval = pd.Interval(left=dates[0], 
                                         right = dates[i] + self.train_size, 
@@ -31,8 +34,7 @@ class TimeCaseSplit:
             
             train_subset = max_by_id[(max_by_id>=train_interval.left) & (max_by_id<=train_interval.right)]
             train_subset, train_interval = strategy.filter(train_subset, train_interval)
-
-            train = pd.merge(group, train_subset, right_index=True, left_on=group.name)[group.name]
+            train = pd.merge(group, train_subset, right_index=True, left_on=group.name)[group.name] # doing a join on the group name and then select the group so basically adding the name 
             
             if len(train.unique()) < self.threshold:
                 continue
