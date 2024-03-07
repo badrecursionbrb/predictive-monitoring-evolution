@@ -4,7 +4,7 @@ from time import time
 import sys
 from sklearn.base import TransformerMixin
 from sklearn.model_selection import GroupShuffleSplit
-from sklearn.utils import safe_indexing
+from sklearn.utils import _safe_indexing
 from sklearn.preprocessing import OneHotEncoder
 from itertools import chain
 from sklearn.ensemble import RandomForestRegressor
@@ -18,7 +18,7 @@ class EventLog:
         self.timestamp_column = timestamp_column
         self.df = df.sort_values([self.id_column, self.timestamp_column]).reset_index(drop=True)
         
-        if not pd.core.dtypes.common.is_datetime_or_timedelta_dtype(self.df[self.timestamp_column]):
+        if not pd.core.dtypes.common.is_datetime64_dtype(self.df[self.timestamp_column]):
             temp = pd.to_datetime(self.df[self.timestamp_column], infer_datetime_format=True,utc=True, errors='raise')
             print('Found ' + str(np.any(pd.isnull(temp))))
             self.df[self.timestamp_column] = temp
@@ -107,7 +107,7 @@ class WrapperEncoder:
         
     def transform(self, X):
         result = self.encoder.transform(X.drop(self.id_column, axis=1))
-        return pd.DataFrame(data=result, columns=self.encoder.get_feature_names())
+        return pd.DataFrame(data=result, columns=self.encoder.get_feature_names_out())
     
     def fit_transform(self, X, y=None):
         return self.fit(X, y).transform(X)
@@ -164,7 +164,7 @@ class FrequencyEncoder(OneHotEncoder):
     def __init__(self, id_column, handle_unknown='error'):
         self.handle_unknown = handle_unknown
         self.id_column = id_column
-        self._categories = 'auto'
+        self.categories = 'auto'
         
     def fit(self,X, y = None):
         self._fit(X.drop(self.id_column, axis=1), handle_unknown=self.handle_unknown)
@@ -270,7 +270,7 @@ class AggregateTransformer(TransformerMixin):
         self.transform_time = time() - start
         return dt_transformed
     
-    def get_feature_names(self):
+    def get_feature_names_out(self):
         return self.columns
 
 
@@ -331,7 +331,7 @@ class AggregateTransformer(TransformerMixin):
         self.transform_time = time() - start
         return dt_transformed
     
-    def get_feature_names(self):
+    def get_feature_names_out(self):
         return self.columns            
 
 def run_experiment(X, y, splits):
