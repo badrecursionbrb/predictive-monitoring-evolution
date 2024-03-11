@@ -40,12 +40,12 @@ for c in bpi2015:
     c.loc[:,['termName', 'caseProcedure','caseStatus', 'Includes_subCases', 'parts']] = c.loc[:,['termName', 'caseProcedure','caseStatus', 'Includes_subCases', 'parts']].fillna('NA')
 
 
-#%%
+
 print(np.any(pd.concat([c['Responsible_actor'].value_counts() for c in bpi2015], axis=1) == 0))
 print(np.any(pd.concat([c['landRegisterID'].value_counts() for c in bpi2015], axis=1) == 0))
 
 
-#%%
+
 for c in bpi2015:
     c.loc[:,['Responsible_actor', 'landRegisterID']] = c.loc[:,['Responsible_actor', 'landRegisterID']].fillna(0)
 
@@ -54,21 +54,21 @@ for c in bpi2015:
 print(np.any(pd.concat([c['SUMleges'].value_counts() for c in bpi2015], axis=1) == 0))
 
 
-#%%
+
 for c in bpi2015:
     c.loc[:,['SUMleges']] = c.loc[:,['SUMleges']].fillna(0)
 
 
-#%%
+
 for c in bpi2015:
     c['HasConceptCase'] = ~c['IDofConceptCase'].isnull()
 
 
-#%%
+
 pd.concat([c.isnull().sum() for c in bpi2015], axis=1)
 
 
-#%%
+
 pd.concat([c.nunique() for c in bpi2015], axis=1)
 
 #%% [markdown]
@@ -79,15 +79,15 @@ import EventLog as el
 logs = [el.EventLog(c, 'case', 'completeTime') for c in bpi2015]
 
 
-#%%
+
 from sklearn.preprocessing import OneHotEncoder
 
 encoder = el.LogEncoder(transformers = [('static_drop', 'drop', ['case_type', 'startDate', 'endDate', 'endDatePlanned', 'last_phase', 'IDofConceptCase']),
                                      ('static_keep', 'keep', ['requestComplete', 'HasConceptCase']),
-                                     ('static_onehot', el.WrapperEncoder(logs[0].id_column,OneHotEncoder(sparse=False)), ['termName', 'caseProcedure', 'Responsible_actor', 'caseStatus', 'Includes_subCases', 'parts', 'landRegisterID']),
+                                     #('static_onehot', el.WrapperEncoder(logs[0].id_column,OneHotEncoder(sparse_output=False)), ['termName', 'caseProcedure', 'Responsible_actor', 'caseStatus', 'Includes_subCases', 'parts', 'landRegisterID']),
                                      ('dynamic_drop', 'drop', ['action_code', 'activityNameNL', 'planned', 'dateStop', 'dateFinished', 'dueDate', 'question']),
                                      ('dynamic_keep', 'keep', ['SUMleges']),
-                                     ('dynamic_freq', el.FrequencyEncoder(logs[0].id_column), ['event', 'org:resource', 'activityNameEN','monitoringResource']),
+                                     #('dynamic_freq', el.FrequencyEncoder(logs[0].id_column), ['event', 'org:resource', 'activityNameEN','monitoringResource']),
                                      ('timestamp', el.TimestampFeatures(logs[0].id_column, ['event_order', 'time_from_start', 'elapsed_time_from_event']), [logs[0].timestamp_column])])
 
 
@@ -98,7 +98,7 @@ encoder.check_unused(logs[0])
 datasets = [encoder.fit_transform(l) for l in logs]
 
 
-#%%
+
 [(dataset.isnull().sum() > 0).sum() for dataset in datasets]
 
 #%% [markdown]
@@ -110,8 +110,8 @@ for log in logs:
     mask_scr = log.df['activityNameEN'] == 'send confirmation receipt'
     mask_rmd = log.df['activityNameEN'] == 'retrieve missing data'
     event_order = log.df.groupby(log.id_column).cumcount()
-    rmd = pd.concat([event_order[mask_rmd], log.df[log.id_column]], axis=1).groupby('case').transform('max')
-    scr = pd.concat([event_order[mask_scr], log.df[log.id_column]], axis=1).groupby('case').transform('max')
+    rmd = pd.concat([event_order[mask_rmd], log.df[log.id_column]], axis=1).groupby('case').transform('max').reset_index()
+    scr = pd.concat([event_order[mask_scr], log.df[log.id_column]], axis=1).groupby('case').transform('max').reset_index()
     y.append(~(scr.isnull() | (rmd > scr))[0])
     
 X = [el.transform_timedeltas(dataset) for dataset in datasets]
@@ -154,27 +154,31 @@ def print_split(splitter, strategy):
 from splitters import CummulativeStrategy, NonCummulativeStrategy, SamplingStrategy, DriftStrategy
 from experiments import compute_weights
 
-#%%
+
 split = TimeCaseSplit(train_size=pd.DateOffset(months=6), train_freq=pd.DateOffset(months=6), test_freq=pd.DateOffset(months=6), test_periods=50, threshold=60)
 print_split(split, strategy=NonCummulativeStrategy(train_size=pd.DateOffset(months=6)))
 print_split(split, strategy=SamplingStrategy(train_size=61, weights=compute_weights(5)))
-print_split(split, strategy=DriftStrategy(drifts=[pd.Timestamp('2013-06-06T06:06')], threshold=61))
+print_split(split, strategy=DriftStrategy(drifts=[pd.Timestamp('2013-06-06T06:06:00+00:00')], threshold=61))
 
-#%%
+
 from splitters import NumberCaseSplit
 split = NumberCaseSplit(train_size=100, train_step=50, test_freq=100, test_periods=50, threshold=60)
 print_split(split, strategy=NonCummulativeStrategy(train_size=100))
 print("-----")
 print_split(split, strategy=SamplingStrategy(train_size=100, weights=compute_weights(5)))
 print("-----")
-print_split(split, strategy=DriftStrategy(drifts=[pd.Timestamp('2013-06-06T06:06')], threshold=61))
+print_split(split, strategy=DriftStrategy(drifts=[pd.Timestamp('2013-06-06T06:06:00+00:00')], threshold=61))
 
 #%% [markdown]
 # ## RQ1: Does the dataset change over time?
 
 #%%
-catcols = set(X[0].columns.values) - set(['SUMleges','event_order_completeTime', 'time_from_start_completeTime', 'elapsed_time_from_event_completeTime'])
+for column in X[0]:
+    print(column)
 
+#%%
+catcols = list(set(X[0].columns.values) - set(['SUMleges','event_order_completeTime', 'time_from_start_completeTime', 'elapsed_time_from_event_completeTime']))
+print(catcols)
 
 #%%
 from splitters import TimeCaseSplit
@@ -182,9 +186,25 @@ from contingency import compute_all_chi2
 
 allchi2 = []
 for i in range(5):
+    print(i)
     tcs = TimeCaseSplit(train_size=pd.DateOffset(months=6), train_freq=pd.DateOffset(months=6), test_freq=pd.DateOffset(months=6), test_periods=50, threshold=60)
-    allchi2.append(compute_all_chi2(X[i].loc[:,catcols], tcs.split(X[i],y[i],logs[i].df[logs[i].id_column], logs[i].df[logs[i].timestamp_column], strategy=NonCummulativeStrategy(train_size=pd.DateOffset(months=6)))))
+    splits = tcs.split(X[i],y[i],logs[i].df[logs[i].id_column], logs[i].df[logs[i].timestamp_column], strategy=NonCummulativeStrategy(train_size=pd.DateOffset(months=6)))
+    chi2_results = compute_all_chi2(X[i].loc[:,catcols], splits)
+    allchi2.append(chi2_results)
 
+# #%%
+# i=1
+# tcs = TimeCaseSplit(train_size=pd.DateOffset(months=6), train_freq=pd.DateOffset(months=6), test_freq=pd.DateOffset(months=6), test_periods=50, threshold=60)
+# splits = tcs.split(X[i],y[i],logs[i].df[logs[i].id_column], logs[i].df[logs[i].timestamp_column], strategy=NonCummulativeStrategy(train_size=pd.DateOffset(months=6)))
+# chi2_results = compute_all_chi2(X[i].loc[:,catcols], splits)
+# allchi2.append(chi2_results)
+
+# #%%
+# splits = tcs.split(X[i],y[i],logs[i].df[logs[i].id_column], logs[i].df[logs[i].timestamp_column], strategy=NonCummulativeStrategy(train_size=pd.DateOffset(months=6)))
+# for a,b,c,d in splits:
+#     print("train_indices: {} test_indices: {} train interval: {} test interval: {}".format(a,b,c,d))
+
+    
 
 #%%
 import seaborn as sns
@@ -216,7 +236,8 @@ for i in range(5):
 #%%
 from experiments import run_experiment, shape_summary, VotingPretrainedClassifier
 from splitters import NumberCaseSplit
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.naive_bayes import GaussianNB
 
 # Utilities for experiments
 
@@ -311,7 +332,7 @@ summary_300150150 = launch_experiment_number(300, 150, 150)
 #%% [markdown]
 # And these are the heatmaps for strategy cummulative for the 5 datasets
 
-#%%
+
 [draw_heatmap(shape_summary(summary_300150150[1][i]).xs('f1-score', axis=1, drop_level=True).fillna(0)) for i in range(5)]
 
 #%% [markdown]
@@ -325,7 +346,7 @@ def extract_values(summary, step = 0):
     return pd.concat([summary[i][mask]['f1-score'] for i in range(len(summary))],axis=1)
 
 
-#%%
+
 summary_300_fscore = [None]*5
 summary_300_fscore = [extract_values([summary_300150150[i][j] for i in range(4)]) for j in range(5)]
 
@@ -333,7 +354,7 @@ for i in range(5):
     summary_300_fscore[i].columns = ['X','V','F','S']
 
 
-#%%
+
 pd.concat([summary_300_fscore[i].mean() for i in range(5)], axis=1)
 
 #%% [markdown]

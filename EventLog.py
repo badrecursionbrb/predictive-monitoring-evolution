@@ -209,7 +209,7 @@ def transform_timedeltas(X):
         df_X = X.drop(timedeltas, axis=1)
         for c in timedeltas:
             df_X[c] = X[c].dt.seconds
-
+        
         return df_X
             
 

@@ -54,6 +54,19 @@ def to_time_interval(interval, max_timestamp):
     return pd.Interval(left = max_timestamp.iloc[interval.left],
                         right = max_timestamp.iloc[interval.right],
                         closed=interval.closed)
+    
+
+class BaselineStrategy:
+    # author: Florian Lang
+    # this class was added to have the baseline strategy being represented too
+    def __init__(self) -> None:
+        super().__init__()
+        self.train_subset_fixed = None
+        
+    def filter(self, train_subset, train_interval):
+        if self.train_subset_fixed == None:
+            self.train_subset_fixed = train_subset
+        return self.train_subset_fixed, train_interval
 
 class CummulativeStrategy:
     def filter(self, max_timestamp, interval):
@@ -136,7 +149,9 @@ class DriftStrategy:
         if len(max_timestamp) >= self.threshold:
             min_left = len(max_timestamp) - self.threshold
             min_time = max_timestamp.iloc[min_left]
+            print(min_time)
             for drift in sorted(self.drifts, reverse=True):
+                print(drift)
                 if min_time > drift:
                     subset = max_timestamp[max_timestamp > drift]
                     train_interval = pd.Interval(left=drift.tz_convert(interval.right.tz),
