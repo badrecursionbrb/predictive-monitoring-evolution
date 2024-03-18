@@ -64,7 +64,9 @@ class BaselineStrategy:
         self.train_subset_fixed = None
         
     def filter(self, train_subset, train_interval):
-        if self.train_subset_fixed == None:
+        if not self.train_subset_fixed is None:
+            return self.train_subset_fixed, train_interval
+        else: 
             self.train_subset_fixed = train_subset
         return self.train_subset_fixed, train_interval
 
