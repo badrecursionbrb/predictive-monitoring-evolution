@@ -196,7 +196,9 @@ class AggregatedReport:
         test_predict = clf.predict(X_test)
 
         report = classification_report(Y_test, test_predict, output_dict = True)
-        auc = roc_auc_score(Y_test, clf.predict_proba(X_test)[:,clf.classes_.tolist().index(self.summary_class)])
+        clf_classes_list = clf.classes_.tolist()
+        probability = clf.predict_proba(X_test)[:, clf_classes_list.index(self.summary_class)]
+        auc = roc_auc_score(Y_test, probability)
         self.summary = np.append(self.summary, 
                                  [report[str(self.summary_class)]['precision'], 
                                   report[str(self.summary_class)]['recall'], 
@@ -267,7 +269,7 @@ class RollingReport:
             return self.summary
 
 
-def run_experiment(X, y, splits, clf, report=None, aggregate_clf=None, verbose=False):
+def run_experiment(X, y, splits, clf, report=None, aggregate_clf=None, verbose=False, summary_class=True):
     """Executes an experiments for the dataset provided by X and y, and using 
     the splits and classifier provided. It also supports the possibility of
     using a mechanism to ensemble classifiers from different splits.
@@ -300,7 +302,7 @@ def run_experiment(X, y, splits, clf, report=None, aggregate_clf=None, verbose=F
     """
 
     if report is None:
-        report = AggregatedReport()
+        report = AggregatedReport(summary_class=summary_class)
 
     current_train_index = []
     last_X_test, last_Y_test = None, None
