@@ -214,7 +214,7 @@ for i in range(5):
 # To answer this question, we are going to analyse the evolution of model performance using the first two strategies (new models each time and updating a model that includes all information):
 
 #%%
-from experiments import shape_summary, VotingPretrained, run_experiment_classifier
+from experiments import run_experiment, shape_summary, VotingPretrainedClassifier, RollingReport
 from splitters import NumberCaseSplit
 from sklearn.ensemble import RandomForestClassifier
 
@@ -239,10 +239,10 @@ def launch_experiment(months_size, months_freq, months_test, datasets=range(0,5)
     summary_X_F = [None] * 5
     clf = RandomForestClassifier(random_state=0,n_estimators=100,n_jobs=-1)
     for i in datasets:
-        agg_clf = VotingPretrained(weights=compute_weights)
-        summary_X[i]= run_experiment_classifier(X[i], ~y[i], splits(i, tcs, CummulativeStrategy()), clf)
-        summary_X_F[i] = run_experiment_classifier(X[i], ~y[i], splits(i, tcs, NonCummulativeStrategy(train_size=pd.DateOffset(months=months_size))), clf)
-        summary_X_V[i] = run_experiment_classifier(X[i], ~y[i], splits(i, tcs, NonCummulativeStrategy(train_size=pd.DateOffset(months=months_size))), clf, aggregate_clf=agg_clf, verbose=True)
+        agg_clf = VotingPretrainedClassifier(weights=compute_weights)
+        summary_X[i]= run_experiment(X[i], ~y[i], splits(i, tcs, CummulativeStrategy()), clf)
+        summary_X_F[i] = run_experiment(X[i], ~y[i], splits(i, tcs, NonCummulativeStrategy(train_size=pd.DateOffset(months=months_size))), clf)
+        summary_X_V[i] = run_experiment(X[i], ~y[i], splits(i, tcs, NonCummulativeStrategy(train_size=pd.DateOffset(months=months_size))), clf, aggregate_clf=agg_clf, verbose=True)
         
     return summary_X, summary_X_V, summary_X_F
 
@@ -253,14 +253,14 @@ def launch_experiment_rolling(size, freq, window, steps, datasets=range(0,5)):
     summary_X_F = [None] * 5
     clf = RandomForestClassifier(random_state=0,n_estimators=100,n_jobs=-1)
     for i in datasets:
-        summary_X[i]= run_experiment_classifier(X[i], ~y[i], 
+        summary_X[i]= run_experiment(X[i], ~y[i], 
                                                 splits(i, ncs, CummulativeStrategy()),
                                                 clf=clf,
                                                 report=RollingReport(window_size=window, 
                                                                      step_size=steps, 
                                                                      summary_class=False), 
                                                 verbose=True)
-        summary_X_F[i]= run_experiment_classifier(X[i], ~y[i], 
+        summary_X_F[i]= run_experiment(X[i], ~y[i], 
                                                 splits(i, ncs, NonCummulativeStrategy(train_size=size)),
                                                 clf=clf,
                                                 report=RollingReport(window_size=window, 
@@ -287,8 +287,6 @@ def launch_experiment_number(size, freq, test, datasets=range(0,5)):
         summary_X_S[i] = run_experiment(X[i], ~y[i], splits(i, ncs, SamplingStrategy(train_size=size, weights=compute_weights(5))), clf=clf)
 
     return summary_X, summary_X_V, summary_X_F, summary_X_S
-
-
 
 
 #%%
