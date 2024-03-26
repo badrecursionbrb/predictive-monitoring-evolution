@@ -110,8 +110,8 @@ for log in logs:
     mask_scr = log.df['activityNameEN'] == 'send confirmation receipt'
     mask_rmd = log.df['activityNameEN'] == 'retrieve missing data'
     event_order = log.df.groupby(log.id_column).cumcount()
-    rmd = pd.concat([event_order[mask_rmd], log.df[log.id_column]], axis=1).groupby('case').transform('max')
-    scr = pd.concat([event_order[mask_scr], log.df[log.id_column]], axis=1).groupby('case').transform('max')
+    rmd = pd.concat([event_order[mask_rmd], log.df[log.id_column]], axis=1).groupby('case').transform('max').reset_index(drop=True)
+    scr = pd.concat([event_order[mask_scr], log.df[log.id_column]], axis=1).groupby('case').transform('max').reset_index(drop=True)
     y.append(~(scr.isnull() | (rmd > scr))[0])
     
 X = [el.transform_timedeltas(dataset) for dataset in datasets]
@@ -158,7 +158,7 @@ from experiments import compute_weights
 split = TimeCaseSplit(train_size=pd.DateOffset(months=6), train_freq=pd.DateOffset(months=6), test_freq=pd.DateOffset(months=6), test_periods=50, threshold=60)
 print_split(split, strategy=NonCummulativeStrategy(train_size=pd.DateOffset(months=6)))
 print_split(split, strategy=SamplingStrategy(train_size=61, weights=compute_weights(5)))
-print_split(split, strategy=DriftStrategy(drifts=[pd.Timestamp('2013-06-06T06:06')], threshold=61))
+print_split(split, strategy=DriftStrategy(drifts=[pd.Timestamp('2013-06-06T06:06:00+00:00')], threshold=61))
 
 #%%
 from splitters import NumberCaseSplit
@@ -167,13 +167,13 @@ print_split(split, strategy=NonCummulativeStrategy(train_size=100))
 print("-----")
 print_split(split, strategy=SamplingStrategy(train_size=100, weights=compute_weights(5)))
 print("-----")
-print_split(split, strategy=DriftStrategy(drifts=[pd.Timestamp('2013-06-06T06:06')], threshold=61))
+print_split(split, strategy=DriftStrategy(drifts=[pd.Timestamp('2013-06-06T06:06:00+00:00')], threshold=61))
 
 #%% [markdown]
 # ## RQ1: Does the dataset change over time?
 
 #%%
-catcols = set(X[0].columns.values) - set(['SUMleges','event_order_completeTime', 'time_from_start_completeTime', 'elapsed_time_from_event_completeTime'])
+catcols = list(set(X[0].columns.values) - set(['SUMleges','event_order_completeTime', 'time_from_start_completeTime', 'elapsed_time_from_event_completeTime']))
 
 
 #%%
@@ -214,7 +214,7 @@ for i in range(5):
 # To answer this question, we are going to analyse the evolution of model performance using the first two strategies (new models each time and updating a model that includes all information):
 
 #%%
-from experiments import run_experiment, shape_summary, VotingPretrainedClassifier
+from experiments import shape_summary, VotingPretrained, run_experiment_classifier
 from splitters import NumberCaseSplit
 from sklearn.ensemble import RandomForestClassifier
 
@@ -239,10 +239,10 @@ def launch_experiment(months_size, months_freq, months_test, datasets=range(0,5)
     summary_X_F = [None] * 5
     clf = RandomForestClassifier(random_state=0,n_estimators=100,n_jobs=-1)
     for i in datasets:
-        agg_clf = VotingPretrainedClassifier(weights=compute_weights)
-        summary_X[i]= run_experiment(X[i], ~y[i], splits(i, tcs, CummulativeStrategy()), clf)
-        summary_X_F[i] = run_experiment(X[i], ~y[i], splits(i, tcs, NonCummulativeStrategy(train_size=pd.DateOffset(months=months_size))), clf)
-        summary_X_V[i] = run_experiment(X[i], ~y[i], splits(i, tcs, NonCummulativeStrategy(train_size=pd.DateOffset(months=months_size))), clf, aggregate_clf=agg_clf, verbose=True)
+        agg_clf = VotingPretrained(weights=compute_weights)
+        summary_X[i]= run_experiment_classifier(X[i], ~y[i], splits(i, tcs, CummulativeStrategy()), clf)
+        summary_X_F[i] = run_experiment_classifier(X[i], ~y[i], splits(i, tcs, NonCummulativeStrategy(train_size=pd.DateOffset(months=months_size))), clf)
+        summary_X_V[i] = run_experiment_classifier(X[i], ~y[i], splits(i, tcs, NonCummulativeStrategy(train_size=pd.DateOffset(months=months_size))), clf, aggregate_clf=agg_clf, verbose=True)
         
     return summary_X, summary_X_V, summary_X_F
 
@@ -253,14 +253,14 @@ def launch_experiment_rolling(size, freq, window, steps, datasets=range(0,5)):
     summary_X_F = [None] * 5
     clf = RandomForestClassifier(random_state=0,n_estimators=100,n_jobs=-1)
     for i in datasets:
-        summary_X[i]= run_experiment(X[i], ~y[i], 
+        summary_X[i]= run_experiment_classifier(X[i], ~y[i], 
                                                 splits(i, ncs, CummulativeStrategy()),
                                                 clf=clf,
                                                 report=RollingReport(window_size=window, 
                                                                      step_size=steps, 
                                                                      summary_class=False), 
                                                 verbose=True)
-        summary_X_F[i]= run_experiment(X[i], ~y[i], 
+        summary_X_F[i]= run_experiment_classifier(X[i], ~y[i], 
                                                 splits(i, ncs, NonCummulativeStrategy(train_size=size)),
                                                 clf=clf,
                                                 report=RollingReport(window_size=window, 
