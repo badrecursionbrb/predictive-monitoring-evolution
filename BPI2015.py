@@ -84,10 +84,10 @@ from sklearn.preprocessing import OneHotEncoder
 
 encoder = el.LogEncoder(transformers = [('static_drop', 'drop', ['case_type', 'startDate', 'endDate', 'endDatePlanned', 'last_phase', 'IDofConceptCase']),
                                      ('static_keep', 'keep', ['requestComplete', 'HasConceptCase']),
-                                     ('static_onehot', el.WrapperEncoder(logs[0].id_column,OneHotEncoder(sparse=False)), ['termName', 'caseProcedure', 'Responsible_actor', 'caseStatus', 'Includes_subCases', 'parts', 'landRegisterID']),
+                                     #('static_onehot', el.WrapperEncoder(logs[0].id_column,OneHotEncoder(sparse=False)), ['termName', 'caseProcedure', 'Responsible_actor', 'caseStatus', 'Includes_subCases', 'parts', 'landRegisterID']),
                                      ('dynamic_drop', 'drop', ['action_code', 'activityNameNL', 'planned', 'dateStop', 'dateFinished', 'dueDate', 'question']),
                                      ('dynamic_keep', 'keep', ['SUMleges']),
-                                     ('dynamic_freq', el.FrequencyEncoder(logs[0].id_column), ['event', 'org:resource', 'activityNameEN','monitoringResource']),
+                                     #('dynamic_freq', el.FrequencyEncoder(logs[0].id_column), ['event', 'org:resource', 'activityNameEN','monitoringResource']),
                                      ('timestamp', el.TimestampFeatures(logs[0].id_column, ['event_order', 'time_from_start', 'elapsed_time_from_event']), [logs[0].timestamp_column])])
 
 
