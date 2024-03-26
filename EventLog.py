@@ -152,7 +152,14 @@ class TimestampFeatures:
                     X_data.append(self._transform_case_aware(X, func=lambda x: x[column].diff(), update_first=pd.Timedelta(0)))
                     X_cols.append('elapsed_time_from_event_'+column)
         
-        result = pd.concat(X_data, axis=1)
+        #convert the columns to integer representation (quick dirty fix)
+        X_data_converted = []
+        for column in X_data:
+            column = column.astype('int64')
+            X_data_converted.append(column)
+
+        result = pd.concat(X_data_converted, axis=1)
+        #result = pd.concat(X_data, axis=1)
         result.columns = X_cols
         
         return result
