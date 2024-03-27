@@ -248,6 +248,19 @@ class NumberCaseSplit:
         self.sampling = sampling
         self.threshold = threshold
         
+    def __init__(self, train_size, train_freq, test_freq=0, test_periods=1, sliding=True, threshold=0, sampling=False):
+        if test_freq == 0 and test_periods > 1:
+            raise ValueError('Invalid combination of test_freq and test_periods')
+            
+        self.train_size = train_size
+        self.train_freq = train_freq
+        #self.train_step = train_step
+        self.test_freq = test_freq
+        self.test_periods = test_periods
+        self.sliding = sliding
+        self.sampling = sampling
+        self.threshold = threshold
+        
         
     def split(self, X, y, group, timestamp, strategy):
         """Generate indices to split data into training and test set
@@ -356,13 +369,16 @@ class NumberCaseSplit:
                 weights = np.repeat([cw[0]], self.train_size)
                 if  i > 0:
                     middle_weights = np.repeat(cw[1:i], self.train_freq)
-                    end_weights = np.repeat([cw[i]], len(mbi_subset) - (self.train_size + (i-1)*self.train_freq))
+                    end_weights_length = max(len(mbi_subset) - (self.train_size + (i-1)*self.train_freq), 0) #had to add the max(.) addition as the intervals not always match up exactly 
+                    end_weights = np.repeat([cw[i]], end_weights_length)
                     weights = np.concatenate((weights, middle_weights, end_weights))
 
-                mbi_subset = mbi_subset.sample(self.train_size, random_state=0, weights=weights)
+                if len(weights) > len(mbi_subset):
+                    weights = weights[:len(mbi_subset)]
+                mbi_subset = mbi_subset.sample(self.train_size, random_state=0, weights=weights) # length of weights need to match the mbi_subset
 
             train = pd.merge(group, mbi_subset, right_index=True, left_on=group.name)[group.name]
-#            train = group[(grouped>=train_interval.left) & (grouped<=train_interval.right)]
+            # train = group[(grouped>=train_interval.left) & (grouped<=train_interval.right)]
             if len(train.unique()) < self.threshold:
                 continue
             
