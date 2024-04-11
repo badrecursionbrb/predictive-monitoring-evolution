@@ -235,31 +235,21 @@ class NumberCaseSplit:
     threshold : int, default = 0
         Minimum number of instances to include in each training or test set        
     """
-    def __init__(self, train_size, train_step, test_freq=0, test_periods=1, sliding=True, threshold=0, sampling=False):
+    def __init__(self, train_size, train_step, test_freq=0, test_periods=1, sliding=True, threshold=0, sampling=False, train_freq=None):
         if test_freq == 0 and test_periods > 1:
             raise ValueError('Invalid combination of test_freq and test_periods')
             
         self.train_size = train_size
-        #self.train_freq = train_freq
-        self.train_step = train_step
+        if train_freq:
+            self.train_freq = train_freq
+        else:
+            self.train_step = train_step
         self.test_freq = test_freq
         self.test_periods = test_periods
         self.sliding = sliding
         self.sampling = sampling
         self.threshold = threshold
         
-    def __init__(self, train_size, train_freq, test_freq=0, test_periods=1, sliding=True, threshold=0, sampling=False):
-        if test_freq == 0 and test_periods > 1:
-            raise ValueError('Invalid combination of test_freq and test_periods')
-            
-        self.train_size = train_size
-        self.train_freq = train_freq
-        #self.train_step = train_step
-        self.test_freq = test_freq
-        self.test_periods = test_periods
-        self.sliding = sliding
-        self.sampling = sampling
-        self.threshold = threshold
         
         
     def split(self, X, y, group, timestamp, strategy):
