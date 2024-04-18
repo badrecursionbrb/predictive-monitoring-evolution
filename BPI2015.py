@@ -84,10 +84,10 @@ from sklearn.preprocessing import OneHotEncoder
 
 encoder = el.LogEncoder(transformers = [('static_drop', 'drop', ['case_type', 'startDate', 'endDate', 'endDatePlanned', 'last_phase', 'IDofConceptCase']),
                                      ('static_keep', 'keep', ['requestComplete', 'HasConceptCase']),
-                                     #('static_onehot', el.WrapperEncoder(logs[0].id_column,OneHotEncoder(sparse=False)), ['termName', 'caseProcedure', 'Responsible_actor', 'caseStatus', 'Includes_subCases', 'parts', 'landRegisterID']),
+                                     ('static_onehot', el.WrapperEncoder(logs[0].id_column,OneHotEncoder(sparse_output=False)), ['termName', 'caseProcedure', 'Responsible_actor', 'caseStatus', 'Includes_subCases', 'parts', 'landRegisterID']),
                                      ('dynamic_drop', 'drop', ['action_code', 'activityNameNL', 'planned', 'dateStop', 'dateFinished', 'dueDate', 'question']),
                                      ('dynamic_keep', 'keep', ['SUMleges']),
-                                     #('dynamic_freq', el.FrequencyEncoder(logs[0].id_column), ['event', 'org:resource', 'activityNameEN','monitoringResource']),
+                                    # ('dynamic_freq', el.FrequencyEncoder(logs[0].id_column), ['event', 'org:resource', 'activityNameEN','monitoringResource']),
                                      ('timestamp', el.TimestampFeatures(logs[0].id_column, ['event_order', 'time_from_start', 'elapsed_time_from_event']), [logs[0].timestamp_column])])
 
 
@@ -173,17 +173,43 @@ print_split(split, strategy=DriftStrategy(drifts=[pd.Timestamp('2013-06-06T06:06
 # ## RQ1: Does the dataset change over time?
 
 #%%
-catcols = list(set(X[0].columns.values) - set(['SUMleges','event_order_completeTime', 'time_from_start_completeTime', 'elapsed_time_from_event_completeTime']))
+catcols = set()
+for i in range(len(X)):
+    catcols.update(list(X[i].columns.values))
+
+# catcols = list(set(X[0].columns.values) - set(['SUMleges','event_order_completeTime', 'time_from_start_completeTime', 'elapsed_time_from_event_completeTime']))
+catcols = catcols - set(['SUMleges','event_order_completeTime', 'time_from_start_completeTime', 'elapsed_time_from_event_completeTime'])
+catcols = sorted(list(catcols))
+print(catcols)
+
+# #%%
+# def add_empty_columns(df: pd.DataFrame, catcols) -> pd.DataFrame:
+#     # add empty columns that do not exist in the DataFrame and fill them with zeros 
+#     for col_name in catcols:
+#         if col_name not in df.columns:
+#             df[col_name] = 0
+#     df = df[df.columns.intersection(catcols)] # deleting all columns not in catcols
+#     return df
+
+# X = [add_empty_columns(df=X_subset, catcols=catcols) for X_subset in X]
 
 
 #%%
 from splitters import TimeCaseSplit
 from contingency import compute_all_chi2
 
+
 allchi2 = []
 for i in range(5):
+    print(i)
     tcs = TimeCaseSplit(train_size=pd.DateOffset(months=6), train_freq=pd.DateOffset(months=6), test_freq=pd.DateOffset(months=6), test_periods=50, threshold=60)
-    allchi2.append(compute_all_chi2(X[i].loc[:,catcols], tcs.split(X[i],y[i],logs[i].df[logs[i].id_column], logs[i].df[logs[i].timestamp_column], strategy=NonCummulativeStrategy(train_size=pd.DateOffset(months=6)))))
+    tcs_splits = list(tcs.split(X[i],y[i],logs[i].df[logs[i].id_column], logs[i].df[logs[i].timestamp_column], strategy=NonCummulativeStrategy(train_size=pd.DateOffset(months=6))))
+
+    catcols = list(set(X[i].columns.values) - set(['SUMleges','event_order_completeTime', 'time_from_start_completeTime', 'elapsed_time_from_event_completeTime']))
+    X_temp = X[i].loc[:,catcols]
+    #X_temp = X[i]
+    all_chi = compute_all_chi2(X_temp, tcs_splits)
+    allchi2.append(all_chi)
 
 
 #%%
@@ -277,6 +303,7 @@ def launch_experiment_number(size, freq, test, datasets=range(0,5)):
     summary_X_V = [None] * 5
     summary_X_F = [None] * 5
     summary_X_S = [None] * 5
+    summary_X_D = [None] * 5
     clf = RandomForestClassifier(random_state=0,n_estimators=100,n_jobs=-1)
 
     for i in datasets:
@@ -285,8 +312,8 @@ def launch_experiment_number(size, freq, test, datasets=range(0,5)):
         agg_clf = VotingPretrainedClassifier(weights=compute_weights)
         summary_X_V[i] = run_experiment(X[i], ~y[i], splits(i, ncs, NonCummulativeStrategy(train_size=size)), clf=clf, aggregate_clf=agg_clf)
         summary_X_S[i] = run_experiment(X[i], ~y[i], splits(i, ncs, SamplingStrategy(train_size=size, weights=compute_weights(5))), clf=clf)
-
-    return summary_X, summary_X_V, summary_X_F, summary_X_S
+        summary_X_D[i] = run_experiment(X[i], ~y[i], splits(i, ncs, DriftStrategy(drifts=[pd.Timestamp('2013-06-06T06:06:00+00:00')], threshold=61)), clf=clf) # added by Florian
+    return summary_X, summary_X_V, summary_X_F, summary_X_S, summary_X_D
 
 
 #%%
@@ -344,4 +371,30 @@ from scipy import stats
 
 
 
-# %%
+#%% [markdown]
+# This here is code written by our team 
+
+#%%
+from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.naive_bayes import GaussianNB
+
+#%%
+def launch_experiment_number_different_models(size, freq, test, datasets=range(0,5)):
+    ncs = NumberCaseSplit(train_size=size, train_step=freq, test_freq=test, test_periods=20, threshold=100)
+
+    summary_X_RF = [None] * 5
+    summary_X_BOOST = [None] * 5
+    summary_X_BN = [None] * 5
+    clf_rf = RandomForestClassifier(random_state=0,n_estimators=100,n_jobs=-1)
+    clf_boost = GradientBoostingClassifier(n_estimators=100, learning_rate=1.0, max_depth=1, random_state=0)
+    clf_bn = GaussianNB()
+    for i in datasets:
+        summary_X_RF[i] = run_experiment(X[i], ~y[i], splits(i, ncs, DriftStrategy(drifts=[pd.Timestamp('2013-06-06T06:06:00+00:00')], threshold=61)), clf=clf_rf) # added by Florian
+        summary_X_BOOST[i] = run_experiment(X[i], ~y[i], splits(i, ncs, DriftStrategy(drifts=[pd.Timestamp('2013-06-06T06:06:00+00:00')], threshold=61)), clf=clf_boost) # added by Florian
+        summary_X_BN[i] = run_experiment(X[i], ~y[i], splits(i, ncs, DriftStrategy(drifts=[pd.Timestamp('2013-06-06T06:06:00+00:00')], threshold=61)), clf=clf_bn) # added by Florian
+    return summary_X_RF, summary_X_BOOST, summary_X_BN
+
+#%%
+summary_different_models = launch_experiment_number_different_models(300, 150, 150)
+
+#%% TODO extract values for f test
