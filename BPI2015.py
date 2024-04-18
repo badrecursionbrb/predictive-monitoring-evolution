@@ -397,4 +397,29 @@ def launch_experiment_number_different_models(size, freq, test, datasets=range(0
 #%%
 summary_different_models = launch_experiment_number_different_models(300, 150, 150)
 
+
+
 #%% TODO extract values for f test
+
+no_models = len(summary_different_models)
+summary_models_fscore = [None]*5
+
+# for j in range(5):
+#     for i in range(no_models): 
+#         summary_models_fscore[i][j] = extract_values(summary_different_models[i][j])
+
+summary_models_fscore = [extract_values([summary_different_models[i][j] for i in range(no_models)]) for j in range(5)]
+
+for i in range(5):
+    summary_models_fscore[i].columns = ['RF','BOOST','Naive Bayes (BN)']
+
+#%%
+pd.concat([summary_models_fscore[i].mean() for i in range(5)], axis=1)
+
+#%% [markdown]
+# Here, we use the T-test related to check whether there is a significant difference between each column. The result is that only the difference between 'V' and 'X is statistically significant.
+
+#%%
+from scipy import stats
+[(d,i,j,stats.ttest_rel(summary_models_fscore[d][i], summary_models_fscore[d][j])) for d in range(5) for ii,i in enumerate(summary_models_fscore[d].columns) for jj,j in enumerate(summary_models_fscore[d].columns) if i < j]
+
