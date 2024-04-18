@@ -235,7 +235,7 @@ class NumberCaseSplit:
     threshold : int, default = 0
         Minimum number of instances to include in each training or test set        
     """
-    def __init__(self, train_size, train_step, test_freq=0, test_periods=1, sliding=True, threshold=0, sampling=False, train_freq=None):
+    def __init__(self, train_size, train_step=None, test_freq=0, test_periods=1, sliding=True, threshold=0, sampling=False, train_freq=None):
         if test_freq == 0 and test_periods > 1:
             raise ValueError('Invalid combination of test_freq and test_periods')
             
