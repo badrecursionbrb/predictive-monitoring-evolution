@@ -87,7 +87,7 @@ encoder = el.LogEncoder(transformers = [('static_drop', 'drop', ['case_type', 's
                                      ('static_onehot', el.WrapperEncoder(logs[0].id_column,OneHotEncoder(sparse_output=False)), ['termName', 'caseProcedure', 'Responsible_actor', 'caseStatus', 'Includes_subCases', 'parts', 'landRegisterID']),
                                      ('dynamic_drop', 'drop', ['action_code', 'activityNameNL', 'planned', 'dateStop', 'dateFinished', 'dueDate', 'question']),
                                      ('dynamic_keep', 'keep', ['SUMleges']),
-                                    # ('dynamic_freq', el.FrequencyEncoder(logs[0].id_column), ['event', 'org:resource', 'activityNameEN','monitoringResource']),
+                                    ('dynamic_freq', el.FrequencyEncoder(logs[0].id_column), ['event', 'org:resource', 'activityNameEN','monitoringResource']),
                                      ('timestamp', el.TimestampFeatures(logs[0].id_column, ['event_order', 'time_from_start', 'elapsed_time_from_event']), [logs[0].timestamp_column])])
 
 
