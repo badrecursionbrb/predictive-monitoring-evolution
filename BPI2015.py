@@ -96,7 +96,7 @@ encoder.check_unused(logs[0])
 
 #%%
 datasets = [encoder.fit_transform(l) for l in logs]
-
+no_datasets = len(datasets)
 
 #%%
 [(dataset.isnull().sum() > 0).sum() for dataset in datasets]
@@ -151,7 +151,7 @@ def print_split(splitter, strategy):
 
 
 #%%
-from splitters import CummulativeStrategy, NonCummulativeStrategy, SamplingStrategy, DriftStrategy
+from splitters import CummulativeStrategy, NonCummulativeStrategy, SamplingStrategy, DriftStrategy, BaselineStrategy
 from experiments import compute_weights
 
 #%%
@@ -260,9 +260,9 @@ def launch_experiment(months_size, months_freq, months_test, datasets=range(0,5)
                         test_freq=pd.DateOffset(months=months_test), 
                         test_periods=14, 
                         threshold=100)
-    summary_X = [None] * 5
-    summary_X_V = [None] * 5
-    summary_X_F = [None] * 5
+    summary_X = [None] * no_datasets
+    summary_X_V = [None] * no_datasets
+    summary_X_F = [None] * no_datasets
     clf = RandomForestClassifier(random_state=0,n_estimators=100,n_jobs=-1)
     for i in datasets:
         agg_clf = VotingPretrainedClassifier(weights=compute_weights)
@@ -275,8 +275,8 @@ def launch_experiment(months_size, months_freq, months_test, datasets=range(0,5)
 def launch_experiment_rolling(size, freq, window, steps, datasets=range(0,5)):
     ncs = NumberCaseSplit(train_size=size,
                           train_step=freq)
-    summary_X = [None] * 5
-    summary_X_F = [None] * 5
+    summary_X = [None] * no_datasets
+    summary_X_F = [None] * no_datasets
     clf = RandomForestClassifier(random_state=0,n_estimators=100,n_jobs=-1)
     for i in datasets:
         summary_X[i]= run_experiment(X[i], ~y[i], 
@@ -298,22 +298,23 @@ def launch_experiment_rolling(size, freq, window, steps, datasets=range(0,5)):
 
 def launch_experiment_number(size, freq, test, datasets=range(0,5)):
     ncs = NumberCaseSplit(train_size=size, train_step=freq, test_freq=test, test_periods=20, threshold=100)
-
-    summary_X = [None] * 5
-    summary_X_V = [None] * 5
-    summary_X_F = [None] * 5
-    summary_X_S = [None] * 5
-    summary_X_D = [None] * 5
+    summary_B = [None] * no_datasets
+    summary_X = [None] * no_datasets
+    summary_X_V = [None] * no_datasets
+    summary_X_F = [None] * no_datasets
+    summary_X_S = [None] * no_datasets
+    summary_X_D = [None] * no_datasets
     clf = RandomForestClassifier(random_state=0,n_estimators=100,n_jobs=-1)
 
     for i in datasets:
+        summary_B[i] = run_experiment(X[i], ~y[i], splits(i, ncs, BaselineStrategy()), clf=clf, verbose=True)
         summary_X[i]= run_experiment(X[i], ~y[i], splits(i, ncs, CummulativeStrategy()), clf=clf, verbose=True)
         summary_X_F[i] = run_experiment(X[i], ~y[i], splits(i, ncs, NonCummulativeStrategy(train_size=size)), clf=clf)
         agg_clf = VotingPretrainedClassifier(weights=compute_weights)
         summary_X_V[i] = run_experiment(X[i], ~y[i], splits(i, ncs, NonCummulativeStrategy(train_size=size)), clf=clf, aggregate_clf=agg_clf)
         summary_X_S[i] = run_experiment(X[i], ~y[i], splits(i, ncs, SamplingStrategy(train_size=size, weights=compute_weights(5))), clf=clf)
         summary_X_D[i] = run_experiment(X[i], ~y[i], splits(i, ncs, DriftStrategy(drifts=[pd.Timestamp('2013-06-06T06:06:00+00:00')], threshold=61)), clf=clf) # added by Florian
-    return summary_X, summary_X_V, summary_X_F, summary_X_S, summary_X_D
+    return summary_B, summary_X, summary_X_V, summary_X_F, summary_X_S, summary_X_D
 
 
 #%%
@@ -351,22 +352,24 @@ def extract_values(summary, step = 0):
 
 
 #%%
-summary_300_fscore = [None]*5
-summary_300_fscore = [extract_values([summary_300150150[i][j] for i in range(4)]) for j in range(5)]
 
-for i in range(5):
-    summary_300_fscore[i].columns = ['X','V','F','S']
+no_strategies = len(summary_300150150)
+summary_300_fscore = [None] * no_datasets
+summary_300_fscore = [extract_values([summary_300150150[i][j] for i in range(no_strategies)]) for j in range(no_datasets)]
+
+for i in range(no_datasets):
+    summary_300_fscore[i].columns = ['B', 'X','V','F','S', 'D']
 
 
 #%%
-pd.concat([summary_300_fscore[i].mean() for i in range(5)], axis=1)
+pd.concat([summary_300_fscore[i].mean() for i in range(no_datasets)], axis=1)
 
 #%% [markdown]
 # Here, we use the T-test related to check whether there is a significant difference between each column. The result is that only the difference between 'V' and 'X is statistically significant.
 
 #%%
 from scipy import stats
-[(d,i,j,stats.ttest_rel(summary_300_fscore[d][i], summary_300_fscore[d][j])) for d in range(5) for ii,i in enumerate(summary_300_fscore[d].columns) for jj,j in enumerate(summary_300_fscore[d].columns) if i < j]
+[(d,i,j,stats.ttest_rel(summary_300_fscore[d][i], summary_300_fscore[d][j])) for d in range(no_datasets) for ii,i in enumerate(summary_300_fscore[d].columns) for jj,j in enumerate(summary_300_fscore[d].columns) if i < j]
 
 
 
@@ -382,9 +385,9 @@ from sklearn.naive_bayes import GaussianNB
 def launch_experiment_number_different_models(size, freq, test, datasets=range(0,5)):
     ncs = NumberCaseSplit(train_size=size, train_step=freq, test_freq=test, test_periods=20, threshold=100)
 
-    summary_X_RF = [None] * 5
-    summary_X_BOOST = [None] * 5
-    summary_X_BN = [None] * 5
+    summary_X_RF = [None] * no_datasets
+    summary_X_BOOST = [None] * no_datasets
+    summary_X_BN = [None] * no_datasets
     clf_rf = RandomForestClassifier(random_state=0,n_estimators=100,n_jobs=-1)
     clf_boost = GradientBoostingClassifier(n_estimators=100, learning_rate=1.0, max_depth=1, random_state=0)
     clf_bn = GaussianNB()
@@ -402,19 +405,19 @@ summary_different_models = launch_experiment_number_different_models(300, 150, 1
 #%% TODO extract values for f test
 
 no_models = len(summary_different_models)
-summary_models_fscore = [None]*5
+summary_models_fscore = [None] * no_datasets
 
 # for j in range(5):
 #     for i in range(no_models): 
 #         summary_models_fscore[i][j] = extract_values(summary_different_models[i][j])
 
-summary_models_fscore = [extract_values([summary_different_models[i][j] for i in range(no_models)]) for j in range(5)]
+summary_models_fscore = [extract_values([summary_different_models[i][j] for i in range(no_models)]) for j in range(no_datasets)]
 
-for i in range(5):
+for i in range(no_datasets):
     summary_models_fscore[i].columns = ['RF','BOOST','Naive Bayes (BN)']
 
 #%%
-pd.concat([summary_models_fscore[i].mean() for i in range(5)], axis=1)
+pd.concat([summary_models_fscore[i].mean() for i in range(no_datasets)], axis=1)
 
 #%% [markdown]
 # Here, we use the T-test related to check whether there is a significant difference between each column. The result is that only the difference between 'V' and 'X is statistically significant.
